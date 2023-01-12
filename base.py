@@ -8,7 +8,7 @@ u.dimensions
 # Select all atoms in the protein
 protein = u.select_atoms('PROTEIN')
 membrane = u.select_atoms('MEMBRANE')
-solute = u.select_atoms('SOLUTE')
+solute = u.select_atoms('SOLVENT')
 
 # Extract the positions of the atoms at every frame in the trajectory
 protpos = protein.positions
