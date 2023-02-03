@@ -1,3 +1,6 @@
+import os
+import zipfile
+
 import MDAnalysis as mda
 import matplotlib as mpl
 import numpy as np
@@ -5,6 +8,8 @@ import tqdm
 from MDAnalysis.lib.mdamath import triclinic_vectors
 from numpy import arange, hstack
 from scipy.spatial import Voronoi
+
+from core import _check_extension, _get_metadata_content
 
 
 # Load the GROMACS trajectory and the corresponding topology file
@@ -318,6 +323,45 @@ def mosaic(center_of_masses, LCOP_per_lipid, box, threshold=0.01):
 
     return volumes, vertices, neighbours
 
+def openModelFile(file_path):
+
+    # Check the extension of the file
+    _check_extension(file_path, extensions=[".lpm"], stop=True)
+
+    # Get the file from the archive
+    compressed_file = zipfile.ZipFile(file_path)
+
+    # Process all the data files
+    for file in compressed_file.namelist():
+
+        current_data = compressed_file.read(file)
+
+        current_file = open(file, 'w')
+        current_file.write(current_data.decode("utf-8"))
+        current_file.close()
+
+    # Extract the training sets from the file
+    coordinates = np.loadtxt('model_coordinates.csv', delimiter=',')
+    distances = np.loadtxt('model_distances.csv', delimiter=',')
+    phases = np.loadtxt('model_phases.csv', delimiter=',', dtype=str)
+
+    # Extract the training parameters from the file
+    general_info, training_infos, training_scores, training_errors = _get_metadata_content('model_data.xml')
+    metadata_content = {
+    'general': general_info,
+    'training': training_infos,
+    'scores': {
+    'scores' : training_scores,
+    'errors' : training_errors
+    }
+    }
+
+    # Delete the files after loading informations
+    for file in compressed_file.namelist():
+        os.remove(file)
+    compressed_file.close()
+
+    return coordinates, distances, phases, metadata_content
 
 def mosaic_bilayer(center_of_masses, boxes, ids, leaflets, threshold=0.01):
 

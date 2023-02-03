@@ -1,8 +1,7 @@
 import MDAnalysis as mda
 import numpy as np
-import open3d as o3d
-from open3d import *
-from sklearn.linear_model import LinearRegression
+from scipy.spatial import Delaunay
+from sklearn.linear_model import LogisticRegressionCV
 
 import procfunc as pf
 
@@ -21,12 +20,13 @@ def predict_phase_separation(traj, lipids):
         S2_tail.append(tail.principal_axes()[1][2])
 
     X = np.vstack([S2_head, S2_tail]).T
-    model = LinearRegression().fit(X, np.zeros(len(X)))
+    model = LogisticRegressionCV().fit(X, np.zeros(len(X)))
+
 
     # Predict whether the system undergoes phase separation or not
     phase_separation = model.coef_[0] > model.coef_[1]
     return phase_separation
-print(phase_separation)
+print()
 
 
 
@@ -34,47 +34,36 @@ print(phase_separation)
 
 
 
-
-
-
-
-
-def membrane_normals(u, k):
+def tessellate_surface(points, physical_param):
     """
-    Estimate normals for a point set using k-nearest neighbors with MDAnalysis.
+    Tessellate a surface from a set of input points, using an assigned physical parameter for color mapping.
+    Outputs the neighbor lists, vertices, and volumes of each triangle
 
     Parameters:
-    - points (numpy array): the point set for which to estimate normals
-    - k (int): the number of nearest neighbors to consider
-
-    Returns:
-    - normals (numpy array): the estimated normals for the point set
+    - points (numpy array): the set of input points
+    - physical_param (numpy array): the physical parameter assigned to each point
     """
+    # Compute the Delaunay triangulation
+    tri = Delaunay(points)
+    triangles = tri.simplices
+    print(len(triangles))
+    # Compute the neighbor lists, vertices and volumes of each triangle
+    # neighbor_lists = [tri.neighbors[i] for i in range(tri.neighbors.shape[0])]
+    # vertices = [tri.vertices[i] for i in range(tri.vertices.shape[0])]
+    # volumes = [np.abs(np.linalg.det(np.vstack((points[triangle],np.ones(3))))) for triangle in triangles]
+    neighbor_lists = tri.neighbors
+    vertices = tri.vertices
+
+    # compute volume of each triangle
+    # volumes = np.zeros(triangles.shape[0])
+    plt.tripcolor(points[:,0], points[:,1], triangles, facecolors=physical_param)
+    plt.show()
+    return tri, triangles
 
 
 
-    membrane = u.select_atoms("MEMBRANE")
-    points = membrane.atoms.positions
 
-    # Use the MDAnalysis implementation of the k-nearest neighbors algorithm
-    knn = mda.lib.mdamath.kneighbors(u.atoms, k)
 
-    # Compute the normals for each point
-    normals = np.zeros_like(points)
-    for i in range(points.shape[0]):
-        # Get the indices of the k-nearest neighbors
-        neighbors = knn[1][i]
-
-        # Compute the normal for the i-th point
-        normal = np.zeros(3)
-        for j in neighbors:
-            vec = points[j] - points[i]
-            normal += vec / np.linalg.norm(vec)
-        normal /= len(neighbors)
-
-        normals[i] = normal
-
-    return normals
 
 def remove_overlapping_points(points):
     unique_points = []
@@ -84,29 +73,32 @@ def remove_overlapping_points(points):
     return unique_points
 
 # Surface reconstruction method using Poisson surface reconstruction algorithm with mesh output as base and densities output as colormap
-def compute_membrane_surface(u):
+def tessellate_surface(points, physical_param):
+    """
+    Tessellate a surface from a set of input points, using an assigned physical parameter for color mapping.
+    Outputs the neighbor lists, vertices, and volumes of each triangle
 
+    Parameters:
+    - points (numpy array): the set of input points
+    - physical_param (numpy array): the physical parameter assigned to each point
+    """
+    # Compute the Delaunay triangulation
+    tri = Delaunay(points)
+    triangles = tri.simplices
+    print(len(triangles))
+    # Compute the neighbor lists, vertices and volumes of each triangle
+    # neighbor_lists = [tri.neighbors[i] for i in range(tri.neighbors.shape[0])]
+    # vertices = [tri.vertices[i] for i in range(tri.vertices.shape[0])]
+    # volumes = [np.abs(np.linalg.det(np.vstack((points[triangle],np.ones(3))))) for triangle in triangles]
+    neighbor_lists = tri.neighbors
+    vertices = tri.vertices
 
-
-        membrane = u.select_atoms("MEMBRANE")
-        points = membrane.atoms.positions
-
-        points = remove_overlapping_points(points, fix=True)
-        normals = membrane_normals(points, k=3)
-        with o3d.utility.VerbosityContextManager(
-            o3d.utility.VerbosityLevel.Debug) as cm:
-
-            pcd = o3d.geometry.PointCloud()
-            pcd.points = o3d.utility.Vector3dVector(points)
-            pcd.normals = o3d.utility.Vector3dVector(normals)
-
-
-            mesh , densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
-                pcd, depth=10)
-
-
-        return mesh, densities
-
+    # compute volume of each triangle
+    # volumes = np.zeros(triangles.shape[0])
+    # Plot the triangulation
+    plt.tripcolor(points[:,0], points[:,1], triangles, facecolors=physical_param)
+    plt.show()
+    return tri, triangles
 
 
 
